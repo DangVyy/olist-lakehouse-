@@ -1,1 +1,4 @@
-
+duckdb
+kagglehub
+python-dotenv
+pandas
