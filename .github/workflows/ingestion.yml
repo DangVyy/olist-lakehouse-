@@ -27,6 +27,5 @@ jobs:
       - name: Run ingestion
         env:
           MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
         run: |
           python ingestion/ingest.py
