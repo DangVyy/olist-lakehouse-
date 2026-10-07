@@ -1,7 +1,6 @@
 name: Olist Ingestion
 
-on:
-  workflow_dispatch:
+on: workflow_dispatch
 
 jobs:
   ingest:
@@ -17,11 +16,9 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Run ingestion
         env:
           MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-        run: |
-          python ingestion/ingest.py
+        run: python ingestion/ingest.py
