@@ -1,8 +1,11 @@
+
 import os
+import csv
+import re
 from pathlib import Path
 
-import duckdb
 from dotenv import load_dotenv
+from google.cloud import bigquery
 
 
 # =========================================================
@@ -18,57 +21,68 @@ print("THƯ MỤC DATA:", DATA_DIR)
 
 
 # =========================================================
-# 2. ĐỌC TOKEN TỪ FILE .env
+# 2. ĐỌC CẤU HÌNH GOOGLE CLOUD TỪ FILE .env
 # =========================================================
 
 ENV_PATH = BASE_DIR / ".env"
 
 load_dotenv(ENV_PATH)
 
-token = os.getenv("MOTHERDUCK_TOKEN")
+PROJECT_ID = os.getenv("GCP_PROJECT_ID", "").strip()
+LOCATION = os.getenv("BQ_LOCATION", "US").strip()
 
-if not token:
+if not PROJECT_ID:
     raise ValueError(
-        "Không tìm thấy MOTHERDUCK_TOKEN trong file .env"
+        "Chưa cấu hình GCP_PROJECT_ID trong file .env"
     )
 
-print("Đã đọc MOTHERDUCK_TOKEN thành công")
+print("\nĐã đọc cấu hình Google Cloud!")
+print("PROJECT ID:", PROJECT_ID)
+print("LOCATION:", LOCATION)
 
 
 # =========================================================
-# 3. KẾT NỐI MOTHERDUCK
+# 3. KẾT NỐI GOOGLE BIGQUERY
 # =========================================================
 
-DATABASE_NAME = "olist_lakehouse"
+print("\nĐang kết nối Google BigQuery...")
 
-print("\nĐang kết nối MotherDuck...")
-print("DATABASE:", DATABASE_NAME)
-
-con = duckdb.connect(
-    f"md:{DATABASE_NAME}?motherduck_token={token}"
+client = bigquery.Client(
+    project=PROJECT_ID,
+    location=LOCATION
 )
 
-print("Kết nối MotherDuck thành công!")
+print("Khởi tạo BigQuery Client thành công!")
+print("PROJECT:", client.project)
 
 
 # =========================================================
-# 4. TẠO SCHEMA BRONZE
+# 4. TẠO DATASET BRONZE
 # =========================================================
 
-con.execute("""
-    CREATE SCHEMA IF NOT EXISTS bronze
-""")
+BRONZE_DATASET = "olist_bronze"
 
-# Đặt bronze làm schema hiện tại
-con.execute("""
-    SET schema = 'bronze'
-""")
+DATASET_ID = f"{PROJECT_ID}.{BRONZE_DATASET}"
 
-current_schema = con.execute(
-    "SELECT current_schema()"
-).fetchone()[0]
+dataset = bigquery.Dataset(DATASET_ID)
+dataset.location = LOCATION
 
-print("SCHEMA HIỆN TẠI:", current_schema)
+client.create_dataset(
+    dataset,
+    exists_ok=True
+)
+
+# Kiểm tra dataset vừa tạo
+created_dataset = client.get_dataset(DATASET_ID)
+
+if created_dataset.location.upper() != LOCATION.upper():
+    raise ValueError(
+        "Location của dataset không khớp cấu hình!"
+    )
+
+print("\nTạo/Kiểm tra Bronze Layer thành công!")
+print("DATASET:", DATASET_ID)
+print("LOCATION:", created_dataset.location)
 
 
 # =========================================================
@@ -97,9 +111,11 @@ if not DATA_DIR.exists():
         f"Không tìm thấy thư mục data/raw: {DATA_DIR}"
     )
 
+print("\nĐã tìm thấy thư mục data/raw!")
+
 
 # =========================================================
-# 7. INGEST 9 FILE CSV VÀO BRONZE
+# 7. INGEST 9 FILE CSV VÀO BIGQUERY BRONZE
 # =========================================================
 
 success_count = 0
@@ -109,55 +125,104 @@ for file_name, table_name in TABLE_MAPPING.items():
 
     file_path = DATA_DIR / file_name
 
+    table_id = (
+        f"{PROJECT_ID}.{BRONZE_DATASET}.{table_name}"
+    )
+
     print("\n========================================")
     print("FILE:", file_name)
-    print("TABLE:", f"bronze.{table_name}")
+    print("TABLE:", table_id)
 
     if not file_path.exists():
-
         print("Không tìm thấy file:", file_path)
-
         failed_tables.append(table_name)
-
         continue
 
     try:
+        # Đọc header của CSV và đếm số dòng nguồn
+        with open(
+            file_path,
+            "r",
+            encoding="utf-8-sig",
+            newline=""
+        ) as csv_file:
 
-        csv_path = file_path.as_posix()
+            reader = csv.reader(csv_file)
+            columns = next(reader)
 
-        print(f"ĐANG TẠO: bronze.{table_name}")
+            # Kiểm tra tên cột tương thích BigQuery
+            for col in columns:
+                if not re.fullmatch(
+                    r"[A-Za-z_][A-Za-z0-9_]*", col
+                ):
+                    raise ValueError(
+                        f"Tên cột không hợp lệ: {col}"
+                    )
 
-        con.execute(
-            f"""
-            CREATE OR REPLACE TABLE bronze.{table_name} AS
-            SELECT *
-            FROM read_csv_auto(
-                '{csv_path}',
-                HEADER = TRUE
+            if len(set(columns)) != len(columns):
+                raise ValueError(
+                    "File CSV có tên cột bị trùng!"
+                )
+
+            source_rows = sum(
+                1 for row in reader if row
             )
-            """
+
+        # Giữ dữ liệu gốc ở dạng STRING
+        schema = [
+            bigquery.SchemaField(col, "STRING")
+            for col in columns
+        ]
+
+        # Cấu hình nạp CSV vào BigQuery
+        job_config = bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.CSV,
+            skip_leading_rows=1,
+            schema=schema,
+            source_column_match="POSITION",
+            write_disposition="WRITE_TRUNCATE",
+            allow_quoted_newlines=True,
+            max_bad_records=0
         )
 
-        row_count = con.execute(
-            f"""
-            SELECT COUNT(*)
-            FROM bronze.{table_name}
-            """
-        ).fetchone()[0]
+        print("ĐANG NẠP:", table_id)
+
+        # Nạp trực tiếp dữ liệu CSV
+        with open(file_path, "rb") as source_file:
+            load_job = client.load_table_from_file(
+                source_file,
+                table_id,
+                job_config=job_config,
+                location=LOCATION
+            )
+
+        # Chờ hoàn thành
+        load_job.result()
+
+        # Kiểm tra bảng đã nạp
+        table = client.get_table(table_id)
+
+        row_count = table.num_rows
+        column_count = len(table.schema)
+
+        print("Số dòng CSV:", source_rows)
+        print("Số dòng BigQuery:", row_count)
+        print("Số cột:", column_count)
+
+        if row_count != source_rows:
+            raise ValueError(
+                "Số dòng BigQuery không khớp dữ liệu nguồn!"
+            )
 
         print(
-            f"THÀNH CÔNG: bronze.{table_name} "
+            f"THÀNH CÔNG: {table_id} "
             f"({row_count:,} dòng)"
         )
 
         success_count += 1
 
     except Exception as e:
-
-        print(
-            f"LỖI khi tạo bronze.{table_name}: {e}"
-        )
-
+        print(f"LỖI khi nạp {table_name}: {e}")
         failed_tables.append(table_name)
 
 
@@ -166,63 +231,25 @@ for file_name, table_name in TABLE_MAPPING.items():
 # =========================================================
 
 print("\n========================================")
-print("KIỂM TRA SCHEMA BRONZE")
+print("KIỂM TRA BIGQUERY BRONZE")
 print("========================================")
 
-tables = con.execute(
-    """
-    SELECT
-        table_schema,
-        table_name
-    FROM information_schema.tables
-    WHERE table_schema = 'bronze'
-    ORDER BY table_name
-    """
-).fetchall()
+tables = list(client.list_tables(DATASET_ID))
 
 if not tables:
-
-    print("Không tìm thấy bảng nào trong bronze")
-
+    print("Không tìm thấy bảng nào trong Bronze")
 else:
-
-    for schema_name, table_name in tables:
-        print(f"- {schema_name}.{table_name}")
-
-
-# =========================================================
-# 9. KIỂM TRA CÁC BẢNG TRONG MAIN
-# =========================================================
-
-print("\n========================================")
-print("KIỂM TRA SCHEMA MAIN")
-print("========================================")
-
-main_tables = con.execute(
-    """
-    SELECT
-        table_schema,
-        table_name
-    FROM information_schema.tables
-    WHERE table_schema = 'main'
-    ORDER BY table_name
-    """
-).fetchall()
-
-if not main_tables:
-
-    print("Schema main không có bảng dữ liệu")
-
-else:
-
-    print("Các bảng hiện đang có trong main:")
-
-    for schema_name, table_name in main_tables:
-        print(f"- {schema_name}.{table_name}")
+    for table in sorted(
+        tables,
+        key=lambda t: t.table_id
+    ):
+        print(
+            f"- {BRONZE_DATASET}.{table.table_id}"
+        )
 
 
 # =========================================================
-# 10. KẾT QUẢ CUỐI
+# 9. TỔNG HỢP KẾT QUẢ INGESTION
 # =========================================================
 
 print("\n========================================")
@@ -235,22 +262,11 @@ print(
 )
 
 if failed_tables:
-
     print(
         "Các bảng lỗi/chưa nạp:",
         ", ".join(failed_tables)
     )
-
 else:
-
     print("Tất cả 9 bảng đã được nạp thành công!")
 
-
-# =========================================================
-# 11. ĐÓNG KẾT NỐI
-# =========================================================
-
-con.close()
-
-print("\nĐã đóng kết nối MotherDuck.")
-print("Hoàn tất ingestion!")
+print("\nHoàn tất BigQuery Bronze Ingestion!")

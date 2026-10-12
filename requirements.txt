@@ -1,4 +1,4 @@
-duckdb
 kagglehub
 python-dotenv
 pandas
+google-cloud-bigquery
