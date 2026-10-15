@@ -1,0 +1,19 @@
+﻿name: 'olist_tv2_bq'
+version: '1.0.0'
+config-version: 2
+profile: 'olist_tv2_bq'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  olist_tv2_bq:
+    staging:
+      +materialized: view
