@@ -1,4 +1,4 @@
-﻿name: 'olist_tv2_bq'
+name: 'olist_tv2_bq'
 version: '1.0.0'
 config-version: 2
 profile: 'olist_tv2_bq'
@@ -16,4 +16,8 @@ clean-targets:
 models:
   olist_tv2_bq:
     staging:
-      +materialized: view
+      +materialized: table
+      +schema: olist_silver
+    marts:
+      +materialized: table
+      +schema: olist_gold
