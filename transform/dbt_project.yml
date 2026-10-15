@@ -18,6 +18,11 @@ models:
     staging:
       +materialized: table
       +schema: olist_silver
+
     marts:
       +materialized: table
       +schema: olist_gold
+
+    ml:
+      +materialized: table
+      +schema: olist_ml
