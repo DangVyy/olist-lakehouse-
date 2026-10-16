@@ -1,0 +1,73 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: "Dimension khach hang; grain la mot dong cho moi customer_id."
+    columns:
+      - name: customer_id
+        description: "Khoa cua khach hang trong don hang Olist."
+        data_tests:
+          - not_null
+          - unique
+
+  - name: dim_products
+    description: "Dimension san pham, co them ten danh muc tieng Anh neu co ban dich."
+    columns:
+      - name: product_id
+        data_tests:
+          - not_null
+          - unique
+
+  - name: dim_sellers
+    description: "Dimension nguoi ban."
+    columns:
+      - name: seller_id
+        data_tests:
+          - not_null
+          - unique
+
+  - name: fct_orders
+    description: "Fact cap don hang; late_delivery = 1 neu giao sau ngay du kien, 0 neu dung som/han, NULL neu chua du nhan."
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+      - name: late_delivery
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+
+  - name: fct_order_items
+    description: "Fact cap dong san pham trong don hang; grain la order_id va order_item_id."
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_orders')
+                field: order_id
+      - name: order_item_id
+        data_tests:
+          - not_null
+      - name: product_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_id
+      - name: seller_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_sellers')
+                field: seller_id

@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: ml_wide_table
+    description: >-
+      One row per Olist order. Aggregated features for downstream ML;
+      late_delivery remains NULL when a reliable delivery label is unavailable.
+    columns:
+      - name: order_id
+        description: "Order identifier for mapping predictions; exclude from model features."
+        data_tests:
+          - not_null
+          - unique
+      - name: late_delivery
+        description: "Target: 1 when delivered late, 0 otherwise, NULL when unlabeled."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
