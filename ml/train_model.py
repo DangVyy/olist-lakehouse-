@@ -35,7 +35,7 @@ import seaborn as sns
 if sys.platform.startswith("win"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-# Configure Paths
+# Cấu hình đường dẫn lưu trữ mô hình và biểu đồ
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PLOTS_DIR = os.path.join(BASE_DIR, "plots")
 MODELS_DIR = os.path.join(BASE_DIR, "models")
@@ -47,7 +47,7 @@ SOURCE_TABLE = f"`{PROJECT_ID}.olist_ml.ml_wide_table`"
 TARGET_TABLE_ML = f"{PROJECT_ID}.olist_ml.order_predictions"
 TARGET_TABLE_GOLD = f"{PROJECT_ID}.olist_gold.order_predictions"
 
-# Feature definitions according to approved Wide Table schema
+# Danh sách đặc trưng đầu vào theo lược đồ bảng phẳng đã phê duyệt
 NUM_COLS = [
     "item_count", "order_value", "freight_value", "total_product_weight_g",
     "max_product_weight_g", "max_product_length_cm", "max_product_height_cm",
@@ -66,22 +66,22 @@ def main():
     print("=" * 75)
 
     # -------------------------------------------------------------------------
-    # 3.4.1. Môi trường tính toán: Kết nối Google BigQuery & Nạp Wide Table
+    # 3.4.1. Môi trường tính toán: Kết nối Google BigQuery và nạp bảng phẳng
     # -------------------------------------------------------------------------
-    print(f"\n[3.4.1] Đang kết nối BigQuery project '{PROJECT_ID}'...")
+    print(f"\n[3.4.1] Đang kết nối kho dữ liệu BigQuery dự án '{PROJECT_ID}'...")
     client = bigquery.Client(project=PROJECT_ID)
 
     query = f"SELECT * FROM {SOURCE_TABLE}"
     print(f"Đang trích xuất dữ liệu từ bảng phẳng: {SOURCE_TABLE}...")
     df_all = client.query(query).to_dataframe()
     total_rows = len(df_all)
-    print(f"-> Nạp thành công: {total_rows} dòng, {df_all.shape[1]} cột.")
+    print(f"-> Nạp dữ liệu thành công: {total_rows} dòng, {df_all.shape[1]} cột.")
 
-    # Cast NUMERIC to float
+    # Chuyển đổi định dạng số thực cho các cột giá trị tiền tệ
     for col in ["order_value", "freight_value"]:
         df_all[col] = df_all[col].astype(float)
 
-    # Filter labeled data
+    # Lọc và tạo bản sao độc lập cho tập dữ liệu đã có nhãn
     df_labeled = df_all[df_all[TARGET_COL].isin([0, 1])].copy()
     df_labeled[TARGET_COL] = df_labeled[TARGET_COL].astype(int)
     labeled_count = len(df_labeled)
@@ -89,10 +89,10 @@ def main():
     ontime_count = labeled_count - late_count
     late_rate = late_count / labeled_count
 
-    print(f"-> Đơn hàng có nhãn (delivered): {labeled_count} đơn.")
-    print(f"   + Đúng hạn / sớm (0): {ontime_count} đơn ({1 - late_rate:.2%})")
-    print(f"   + Giao trễ (1): {late_count} đơn ({late_rate:.2%})")
-    print(f"-> Đơn hàng chưa có nhãn (NULL): {total_rows - labeled_count} đơn.")
+    print(f"-> Đơn hàng đã có nhãn hoàn tất: {labeled_count} đơn.")
+    print(f"   + Giao đúng hạn hoặc sớm (0): {ontime_count} đơn ({1 - late_rate:.2%})")
+    print(f"   + Giao trễ hạn (1): {late_count} đơn ({late_rate:.2%})")
+    print(f"-> Đơn hàng chưa xác định nhãn: {total_rows - labeled_count} đơn.")
 
     # -------------------------------------------------------------------------
     # 3.4.2. Huấn luyện thuật toán
