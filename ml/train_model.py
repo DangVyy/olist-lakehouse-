@@ -45,7 +45,6 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 PROJECT_ID = "olist-lakehouse-511407"
 SOURCE_TABLE = f"`{PROJECT_ID}.olist_ml.ml_wide_table`"
 TARGET_TABLE_ML = f"{PROJECT_ID}.olist_ml.order_predictions"
-TARGET_TABLE_GOLD = f"{PROJECT_ID}.olist_gold.order_predictions"
 
 # Danh sách đặc trưng đầu vào theo lược đồ bảng phẳng đã phê duyệt
 NUM_COLS = [
@@ -62,7 +61,7 @@ ID_COL = "order_id"
 def main():
     start_time = time.time()
     print("=" * 75)
-    print("BẮT ĐẦU QUY TRÌNH HỌC MÁY — DỰ BÁO NGUY CƠ GIAO HÀNG TRỄ (TV3)")
+    print("BẮT ĐẦU QUY TRÌNH HỌC MÁY — DỰ BÁO NGUY CƠ GIAO HÀNG TRỄ ")
     print("=" * 75)
 
     # -------------------------------------------------------------------------
@@ -307,8 +306,8 @@ def main():
 
     # -------------------------------------------------------------------------
     # 3.4.4. Cập nhật kết quả dự báo ngược lại kho dữ liệu (Write-back)
-    # Cấu trúc chuẩn 7 cột theo đúng phân công trong CHƯƠNG 3.docx:
-    # order_id, prediction_date, late_probability, predicted_late, risk_level,
+    # Cấu trúc chuẩn 6 cột theo đúng phân công trong CHƯƠNG 3.docx:
+    # order_id, late_probability, predicted_late, risk_level,
     # top_risk_factor_1, top_risk_factor_2
     # -------------------------------------------------------------------------
     print("\n[3.4.4] Tạo bảng kết quả dự báo order_predictions và đẩy lên BigQuery...")
@@ -359,21 +358,16 @@ def main():
         "top_risk_factor_2": top_factor_2_list
     })
 
-    print(f"-> Bảng kết quả dự báo có {len(predictions_df)} dòng (đúng 6 cột theo CHƯƠNG 3):")
+    print(f"-> Bảng kết quả dự báo có {len(predictions_df)} dòng :")
     print(predictions_df.head())
     print(predictions_df["risk_level"].value_counts())
 
-    # Ghi dữ liệu vào BigQuery dataset olist_ml và olist_gold
+    # Ghi dữ liệu vào BigQuery dataset olist_ml
     print(f"\n-> Đang xuất bảng kết quả vào BigQuery: {TARGET_TABLE_ML}...")
     job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
     job_ml = client.load_table_from_dataframe(predictions_df, TARGET_TABLE_ML, job_config=job_config)
     job_ml.result()
     print(f"-> Ghi thành công vào {TARGET_TABLE_ML}!")
-
-    print(f"-> Đang đồng bộ hóa sang tầng Gold: {TARGET_TABLE_GOLD}...")
-    job_gold = client.load_table_from_dataframe(predictions_df, TARGET_TABLE_GOLD, job_config=job_config)
-    job_gold.result()
-    print(f"-> Ghi thành công vào {TARGET_TABLE_GOLD}!")
 
     # Mẫu 5 dòng đầu
     print("\n--- MẪU 5 DÒNG ĐẦU BẢNG KẾT QUẢ DỰ BÁO ---")
@@ -381,7 +375,7 @@ def main():
 
     total_duration = time.time() - start_time
     print(f"\n{'=' * 75}")
-    print(f"HOÀN TẤT TOÀN BỘ PIPELINE ML CỦA THÀNH VIÊN 3 TRONG {total_duration:.2f} GIÂY!")
+    print(f"HOÀN TẤT TOÀN BỘ PIPELINE ML TRONG {total_duration:.2f} GIÂY!")
     print(f"{'=' * 75}")
 
 if __name__ == "__main__":
