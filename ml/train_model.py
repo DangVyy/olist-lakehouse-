@@ -306,9 +306,7 @@ def main():
 
     # -------------------------------------------------------------------------
     # 3.4.4. Cập nhật kết quả dự báo ngược lại kho dữ liệu (Write-back)
-    # Cấu trúc chuẩn 6 cột theo đúng phân công trong CHƯƠNG 3.docx:
-    # order_id, late_probability, predicted_late, risk_level,
-    # top_risk_factor_1, top_risk_factor_2
+
     # -------------------------------------------------------------------------
     print("\n[3.4.4] Tạo bảng kết quả dự báo order_predictions và đẩy lên BigQuery...")
 
@@ -325,17 +323,23 @@ def main():
     full_shap_vals = explainer.shap_values(X_full_trans)
     print(f"-> Hoàn tất tính SHAP sau {time.time() - t_shap:.2f}s.")
 
-    # Trích xuất đúng Top 2 tác nhân rủi ro hàng đầu theo đúng CHƯƠNG 3
+    # Trích xuất đúng Top 2 tác nhân rủi ro hàng đầu (chỉ lấy đặc trưng có SHAP > 0 làm tăng nguy cơ trễ)
     print("-> Đang trích xuất top_risk_factor_1 và top_risk_factor_2...")
     top_factor_1_list = []
     top_factor_2_list = []
 
     for i in range(len(df_all)):
         sv = full_shap_vals[i]
-        top_idx = np.argsort(sv)[::-1][:2]
-        f_list = [all_feature_names[idx] for idx in top_idx]
-        top_factor_1_list.append(f_list[0])
-        top_factor_2_list.append(f_list[1])
+        # Chỉ xét các đặc trưng có SHAP > 0 (tác nhân thực sự đẩy xác suất trễ tăng lên)
+        pos_indices = np.where(sv > 0)[0]
+        if len(pos_indices) > 0:
+            # Sắp xếp giảm dần theo giá trị SHAP dương
+            sorted_pos = pos_indices[np.argsort(sv[pos_indices])[::-1]]
+            top_factor_1_list.append(all_feature_names[sorted_pos[0]])
+            top_factor_2_list.append(all_feature_names[sorted_pos[1]] if len(sorted_pos) > 1 else None)
+        else:
+            top_factor_1_list.append(None)
+            top_factor_2_list.append(None)
 
     # Gán Risk Level theo ngưỡng xác suất chuẩn
     def assign_risk_level(p):
