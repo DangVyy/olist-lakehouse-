@@ -2,3 +2,10 @@
 .venv/
 gha-creds-*.json
 
+
+**/.streamlit/secrets.toml
+secrets.toml
+.env
+service-account*.json
+*-key*.json
+.venv*/

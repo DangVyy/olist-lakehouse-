@@ -1,0 +1,221 @@
+
+======================================================================
+1. DATASET VÀ BẢNG TRÊN BIGQUERY
+======================================================================
+olist_bronze
+     category_translation
+     customers
+     geolocation
+     order_items
+     orders
+     payments
+     products
+     reviews
+     sellers
+olist_gold
+     dim_customers
+     dim_products
+     dim_sellers
+     fct_order_items
+     fct_orders
+olist_ml
+     ml_wide_table
+     order_predictions
+olist_silver
+     stg_category_translation
+     stg_customers
+     stg_geolocation
+     stg_order_items
+     stg_orders
+     stg_payments
+     stg_products
+     stg_reviews
+     stg_sellers
+
+======================================================================
+2. order_predictions
+======================================================================
+Kích thước: (99441, 6)
+order_id                 str
+late_probability     float64
+predicted_late         Int64
+risk_level               str
+top_risk_factor_1        str
+top_risk_factor_2        str
+dtype: object
+                           order_id  late_probability  predicted_late risk_level top_risk_factor_1  top_risk_factor_2
+0  0b8a71b3f5c221a69f4d23097cd604f6            0.1662               0   Low Risk       distance_km  customer_state_AL
+1  cc97c71d908caa2c0b5754b35ebaccd8            0.1957               0   Low Risk       distance_km  customer_state_AL
+2  4e506215592eafe8d7366eb7fa6cf532            0.2241               0   Low Risk       distance_km  customer_state_AL
+3  1c3a0c1d7e9d92523cfe3bfad809a439            0.2548               0   Low Risk    purchase_month  customer_state_AL
+4  ed18204b2bef82c1eeb3f13852c9dbdf            0.2859               0   Low Risk       distance_km  customer_state_AL
+
+risk_level:
+risk_level
+Low Risk       56868
+Medium Risk    31401
+High Risk      11172
+Name: count, dtype: int64
+
+predicted_late:
+predicted_late
+0    77177
+1    22264
+Name: count, dtype: Int64
+
+late_probability:
+count    99441.000000
+mean         0.356318
+std          0.201577
+min          0.010400
+25%          0.201600
+50%          0.314200
+75%          0.474800
+max          0.951600
+Name: late_probability, dtype: float64
+
+Số dòng top_risk_factor_1 = None: 0
+Số dòng top_risk_factor_2 = None: 0
+
+top_risk_factor_1 (25 giá trị phổ biến nhất):
+top_risk_factor_1
+purchase_month                            27084
+purchase_weekday                          10092
+customer_state_SP                          9309
+customer_state_RJ                          8068
+distance_km                                7228
+seller_prep_days                           5810
+order_value                                3670
+customer_state_MG                          3597
+max_product_width_cm                       3457
+seller_state_SP                            3244
+total_product_weight_g                     2233
+max_product_weight_g                       2067
+seller_state_RJ                            2005
+max_product_length_cm                      1499
+customer_state_BA                          1481
+customer_state_ES                          1338
+max_product_height_cm                      1334
+freight_value                              1122
+product_category_name_beleza_saude          747
+customer_state_SC                           613
+item_count                                  520
+product_category_name_moveis_decoracao      420
+product_category_name_bebes                 290
+customer_state_AL                           277
+product_category_name_cama_mesa_banho       274
+Name: count, dtype: int64
+
+top_risk_factor_2 (25 giá trị phổ biến nhất):
+top_risk_factor_2
+customer_state_SP                         19509
+seller_state_SP                           11484
+customer_state_MG                         10608
+purchase_weekday                           7937
+seller_prep_days                           5741
+max_product_width_cm                       5078
+order_value                                4447
+distance_km                                4271
+total_product_weight_g                     3977
+customer_state_RJ                          3619
+item_count                                 2843
+max_product_height_cm                      2528
+max_product_weight_g                       2334
+freight_value                              2215
+purchase_month                             2064
+max_product_length_cm                      1994
+seller_state_RJ                            1263
+customer_state_BA                          1084
+product_category_name_beleza_saude         1005
+product_category_name_moveis_decoracao      666
+customer_state_SC                           657
+product_category_name_cama_mesa_banho       626
+customer_state_PR                           542
+customer_state_ES                           517
+customer_state_MA                           365
+Name: count, dtype: int64
+
+======================================================================
+3. ml_wide_table (5 dòng đầu)
+======================================================================
+order_id                      str
+item_count                  Int64
+order_value                object
+freight_value              object
+total_product_weight_g    float64
+max_product_weight_g      float64
+max_product_length_cm     float64
+max_product_height_cm     float64
+max_product_width_cm      float64
+product_category_name         str
+customer_state                str
+seller_state                  str
+purchase_month              Int64
+purchase_weekday            Int64
+seller_prep_days          float64
+distance_km               float64
+late_delivery               Int64
+dtype: object
+                           order_id  item_count order_value freight_value  total_product_weight_g  max_product_weight_g  max_product_length_cm  max_product_height_cm  max_product_width_cm product_category_name  \
+0  02bfe71c2bbd56f6de9c2c357adff45c           0        None          None                     NaN                   NaN                    NaN                    NaN                   NaN               unknown   
+1  7d576f29bdf44b7857414baff1c788b1           0        None          None                     NaN                   NaN                    NaN                    NaN                   NaN               unknown   
+2  91663de20f19686d62e4dbc0087fcf62           0        None          None                     NaN                   NaN                    NaN                    NaN                   NaN               unknown   
+
+  customer_state seller_state  purchase_month  purchase_weekday  seller_prep_days  distance_km  late_delivery  
+0             PR      unknown              12                 0               NaN          NaN           <NA>  
+1             PR      unknown              11                 0               NaN          NaN           <NA>  
+2             RJ      unknown               7                 6               NaN          NaN           <NA>  
+
+======================================================================
+4. KIỂM TRA JOIN theo order_id
+======================================================================
+   so_dong_sau_join  so_order_khac_nhau
+0             99441               99441
+
+======================================================================
+5. NHÃN THẬT (late_delivery) so với risk_level
+======================================================================
+   late_delivery   risk_level      n  avg_p
+0           <NA>    High Risk    374  0.767
+1           <NA>     Low Risk   1616  0.222
+2           <NA>  Medium Risk    975  0.472
+3              0    High Risk   7224  0.748
+4              0     Low Risk  54711  0.213
+5              0  Medium Risk  28006  0.466
+6              1    High Risk   3574  0.786
+7              1     Low Risk    541  0.267
+8              1  Medium Risk   2420  0.517
+
+Trong nhóm High Risk có nhãn: 3574/10798 đơn thật sự trễ (33.1%).
+
+======================================================================
+6. TỶ LỆ TRỄ THẬT THEO NĂM-THÁNG (olist_gold.fct_orders)
+======================================================================
+   nam_thang  so_don  ty_le_tre
+0    2016-09       4     1.0000
+1    2016-10     324     0.0074
+2    2016-12       1     0.0000
+3    2017-01     800     0.0293
+4    2017-02    1780     0.0296
+5    2017-03    2682     0.0456
+6    2017-04    2404     0.0656
+7    2017-05    3700     0.0299
+8    2017-06    3245     0.0303
+9    2017-07    4026     0.0279
+10   2017-08    4331     0.0291
+11   2017-09    4285     0.0439
+12   2017-10    4631     0.0418
+13   2017-11    7544     0.1240
+14   2017-12    5673     0.0746
+15   2018-01    7269     0.0570
+16   2018-02    6728     0.1414
+17   2018-03    7211     0.1896
+18   2018-04    6939     0.0450
+19   2018-05    6873     0.0656
+20   2018-06    6167     0.0116
+21   2018-07    6292     0.0338
+22   2018-08    6512     0.0619
+23   2018-09      16        NaN
+24   2018-10       4        NaN
+
+XONG. Gửi lại file check_data_output.txt (hoặc dán nội dung) cho trợ lý.
