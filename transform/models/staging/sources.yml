@@ -1,0 +1,17 @@
+version: 2
+
+sources:
+  - name: bronze
+    database: "olist-lakehouse-511407"
+    schema: olist_bronze
+    description: "Du lieu Bronze goc cua Olist tren BigQuery"
+    tables:
+      - name: category_translation
+      - name: customers
+      - name: geolocation
+      - name: order_items
+      - name: orders
+      - name: payments
+      - name: products
+      - name: reviews
+      - name: sellers

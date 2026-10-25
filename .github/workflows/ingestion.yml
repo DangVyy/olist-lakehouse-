@@ -1,0 +1,95 @@
+
+name: Olist BigQuery Ingestion
+
+# Chạy thủ công từ GitHub Actions
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - develop
+    paths:
+      - ".github/workflows/ingestion.yml"
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      # 1. Lấy mã nguồn từ GitHub
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Thiết lập Python
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 3. Xác thực Google Cloud
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: olist-lakehouse-511407
+
+      # 4. Cài đặt thư viện
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 5. Tải dataset Olist từ Kaggle
+      - name: Download Olist dataset
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          import kagglehub
+
+          source_dir = Path(
+              kagglehub.dataset_download(
+                  "olistbr/brazilian-ecommerce"
+              )
+          )
+
+          target_dir = Path("data/raw")
+          target_dir.mkdir(parents=True, exist_ok=True)
+
+          filenames = [
+              "olist_customers_dataset.csv",
+              "olist_orders_dataset.csv",
+              "olist_order_items_dataset.csv",
+              "olist_products_dataset.csv",
+              "olist_sellers_dataset.csv",
+              "olist_order_payments_dataset.csv",
+              "olist_order_reviews_dataset.csv",
+              "olist_geolocation_dataset.csv",
+              "product_category_name_translation.csv",
+          ]
+
+          for filename in filenames:
+              matches = list(source_dir.rglob(filename))
+
+              if len(matches) != 1:
+                  raise FileNotFoundError(
+                      f"Không tìm thấy đúng 1 file: {filename}"
+                  )
+
+              shutil.copy2(
+                  matches[0],
+                  target_dir / filename
+              )
+
+              print("Downloaded:", filename)
+          PY
+
+      # 6. Nạp dữ liệu vào BigQuery Bronze
+      - name: Run BigQuery ingestion
+        env:
+          GCP_PROJECT_ID: olist-lakehouse-511407
+          BQ_LOCATION: US
+        run: |
+          python ingestion/ingest.py
